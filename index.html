@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.12.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bops@1.0.1/dist/bops.js"></script>
+<script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+<script
+  src="https://code.jquery.com/jquery-3.6.0.min.js"
+  integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+  crossorigin="anonymous"></script>
+<script>
+var graph = {};
+var subGraph = {};
+
+function init() {
+
+}
+
+function hash(object) {
+    return CryptoJS.SHA256(JSON.stringify(object)).toString();
+}
+
+function addArtifact(name, data, type, parents) {
+    var node = {
+        "name": name,
+        "data": data,
+        "type": type,
+        "parents": parents,
+    };
+    nodeHash = hash(node);
+    node["nodeHash"] = nodeHash;
+    graph[nodeHash] = node;
+}
+
+function view() {
+    for(var n in graph) {
+        if (nodes._data[n] === undefined) {
+            switch (graph[n].type) {
+                case "link":
+                    l = graph[n].data;
+                    mainLink = l.split("/").slice(0,3).join("/");
+                    label = l.split("/").slice(2).join("/");
+                    if (label.length > 20) {
+                        label = label.slice(0,10) + "..." + label.slice(-7);
+                    }
+                    nodes.add({name: graph[n].name, id: n, shape: "image", image: mainLink + "/favicon.ico", label: label});
+                    break;
+                case "text":
+                    fullText = graph[n].data;
+                    label = "";
+                    line = "";
+                    f=false;
+                    for(var i=0;i<fullText.length;i++) {
+                        if (i>300) {
+                            label = label.slice(0,-2) + "...";
+                            break;
+                        }
+                        line += fullText[i];
+                        if (line.length >= 30) f=true;
+                        if (f && fullText[i] == " ") {
+                            label += line + "\n";
+                            line = "";
+                            f = false;
+                        }
+                    }
+                    nodes.add({name: graph[n].name, id: n, shape: "box", label: label});
+                    break;                    
+            }
+            parents = graph[n].parents
+            for(var p in parents) {
+                f = false;
+                for(c in edges) {
+                    if ((edges[c].from == parents[p][0]) && (edges[c].to == graph[n].nodeHash)) {
+                        f = true;
+                        break;
+                    }
+                }
+                if (!f) {
+                    edges.add({from: parents[p][0], to: graph[n].nodeHash, label: parents[p][2]});
+                }
+            }
+        }
+    }
+}
+
+function test() {
+    for(var i=0;i<30;i++) {
+        addArtifact(hash(Math.random()), "article", [])
+    }
+    view();
+}
+
+function testLink() {
+    addArtifact("https://meduza.io/feature/2022/02/02/v-groznom-proshel-miting-na-kotorom-sozhgli-portrety-chlenov-semi-yangulbaevyh", "link", []);
+    view();
+}
+
+async function updateGraph() {
+    const response = await fetch('/g', {
+        method: 'POST', 
+        mode: 'cors', 
+        cache: 'no-cache', 
+        credentials: 'same-origin', 
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        redirect: 'follow', 
+        referrerPolicy: 'no-referrer',
+        body: JSON.stringify(subGraph)
+    });
+    response.json().then(data => {
+        for(var n in data) {
+            if (graph[n] === undefined) {
+                graph[n] = data[n];
+            }
+        }
+        view();
+    });
+}
+
+async function search(t) {
+    let found = document.getElementById("found");
+    if (t.trim()=="") {
+        found.innerHTML = "";
+        return 0;
+    };
+    const response = await fetch('/q', {
+        method: 'POST', 
+        mode: 'cors', 
+        cache: 'no-cache', 
+        credentials: 'same-origin', 
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        redirect: 'follow', 
+        referrerPolicy: 'no-referrer',
+        body: JSON.stringify(
+            {
+                query: t
+            }
+        )
+    });
+    response.json().then(data => {
+        found.innerHTML = "";
+        for(var i in data) {
+            f = false;
+            for(var j in nodes._data) {
+                if (nodes._data[j].name == data[i].name) f = true;
+            }
+            if (f) continue;
+            found.innerHTML += '<div onclick="loadNode(this,\'' + data[i].name + '\')"><img src="' + data[i].favicon + '" />' + data[i].name + '</div>';
+        }
+    });
+}
+
+async function loadNode(d,t) {
+    d.innerHTML = "";
+    d.outerHTML = "";
+    d = null;
+    const response = await fetch('/n', {
+        method: 'POST', 
+        mode: 'cors', 
+        cache: 'no-cache', 
+        credentials: 'same-origin', 
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        redirect: 'follow', 
+        referrerPolicy: 'no-referrer',
+        body: JSON.stringify(
+            {
+                name: t
+            }
+        )
+    });
+
+    response.json().then(data => {
+        addArtifact(t, data.data, data.type);
+        view();
+    });
+}
+
+function closePopup() {
+    document.getElementById("searchinput").value = "";
+}
+
+function updateSelected() {
+    let s = ntw.getSelectedNodes();
+    let btn = document.getElementById("updbtn");
+    subGraph = {};
+    for(var i in s) {
+        subGraph[s[i]] = graph[s[i]];
+    }
+    if(s.length > 0) {
+        btn.style.visibility = "visible";
+    } else {
+        btn.style.visibility = "hidden";
+    }
+}
+
+
+
+</script>
+<style type="text/css">
+body {
+    background-color: #000;
+}
+
+#network {
+    position: fixed;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+#search {
+    position: fixed;
+    z-index: 999;
+    left: calc(50% - 200px);
+}
+
+#search input {
+    font-size: 24pt;
+    outline: none;
+    padding: 0.2em;
+    border-radius: 0.2em 0.2em 0.2em 0.2em;
+    border-style: none;
+    width: 400px;
+}
+
+#search button {
+    font-size: 24pt;
+    padding: 0.2em;
+    border-radius: 0 0.2em 0.2em 0;
+    border-style: none;
+    width: 3em;
+}
+
+#found {
+    background-color: #fff;
+    font-size: 24pt;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+#found div {
+    padding: 0.2em;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-bottom-color: #eee;
+}
+
+#found div:hover {
+    background-color: #eee;
+    cursor: pointer;
+}
+
+#found img {
+    width: 0.7em;
+    height: 0.7em;
+    margin-right: 0.2em;
+}
+
+#updbtn {
+    position: fixed;
+    bottom: 2em;
+    left: calc(50% - 50px);
+    width: 100px;
+    height: 100px;
+    background-color: #000;
+    border-style: solid;
+    border-radius: 0.3em;
+    box-shadow: 0 0 4px #fff;
+}
+</style>
+</head>
+<body onload="init()" oncontextmenu="return false">
+    <div id="network"></div>
+    <div id="search">
+        <input id="searchinput" type="text" oninput="search(this.value)" spellcheck="false"></input>
+        <div id="found">
+        </div>
+    </div>
+    <button id="updbtn" onclick="updateGraph()"></button>
+    <script type="text/javascript">
+        var nodes = new vis.DataSet([
+        ]);
+
+        var edges = new vis.DataSet([
+        ]);
+
+        var container = document.getElementById("network");
+        var data = {
+            nodes: nodes,
+            edges: edges,
+        };
+        var options = {    
+            edges: {
+                smooth: false,
+                color: {
+                    color: "#ffffff"
+                }
+            },
+            interaction:{
+                multiselect: true
+            },
+            physics: true,
+        };
+        var ntw;
+
+        const makeMeMultiSelect = (container, network, nodes) => {
+            const NO_CLICK = 0;
+            const RIGHT_CLICK = 3;
+    
+            // Disable default right-click dropdown menu
+            container.oncontextmenu = () => false;
+            
+            // State
+            
+            let drag = false, DOMRect = {};
+
+            // Selector
+            
+            const canvasify = (DOMx, DOMy) => {
+                    const { x, y } = network.DOMtoCanvas({ x: DOMx, y: DOMy });
+                return [x, y];
+            };
+            
+            const correctRange = (start, end) =>
+                start < end ? [start, end] : [end, start];
+
+            const selectFromDOMRect = () => {
+                const [sX, sY] = canvasify(DOMRect.startX, DOMRect.startY);
+                const [eX, eY] = canvasify(DOMRect.endX, DOMRect.endY);
+                const [startX, endX] = correctRange(sX, eX);
+                const [startY, endY] = correctRange(sY, eY);
+
+
+                network.selectNodes(nodes.get().reduce(
+                    (selected, { id }) => {
+                        const { x, y } = network.getPositions(id)[id];
+                        return (startX <= x && x <= endX && startY <= y && y <= endY) ?
+                            selected.concat(id) : selected;
+                    }, []
+                ));
+            }
+
+            // Listeners
+
+            container.on("mousedown", function({ which, pageX, pageY }) {
+                    // When mousedown, save the initial rectangle state
+                if(which === RIGHT_CLICK) {
+                    Object.assign(DOMRect, {
+                        startX: pageX - this.offsetLeft,
+                        startY: pageY - this.offsetTop,
+                        endX: pageX - this.offsetLeft,
+                        endY: pageY - this.offsetTop
+                    });
+                    drag = true;
+                }
+            });
+
+            container.on("mousemove", function({ which, pageX, pageY }) {
+                // Make selection rectangle disappear when accidently mouseupped outside 'container'
+                if(which === NO_CLICK && drag) {
+                    drag = false;
+                    network.redraw();
+                }
+                // When mousemove, update the rectangle state
+                else if(drag) {
+                    Object.assign(DOMRect, {
+                        endX: pageX - this.offsetLeft,
+                        endY: pageY - this.offsetTop
+                    });
+                    network.redraw();
+                }
+            });
+
+            container.on("mouseup", function({ which }) {
+                    // When mouseup, select the nodes in the rectangle
+                if(which === RIGHT_CLICK) {
+                    drag = false;
+                    network.redraw();
+                    selectFromDOMRect();
+                    updateSelected();
+                }
+            });
+
+            // Drawer
+
+            network.on('afterDrawing', ctx => {
+                if(drag) {
+                    const [startX, startY] = canvasify(DOMRect.startX, DOMRect.startY);
+                    const [endX, endY] = canvasify(DOMRect.endX, DOMRect.endY);
+
+                    ctx.setLineDash([5]);
+                    ctx.strokeStyle = 'rgba(78, 146, 237, 0.75)';
+                    ctx.strokeRect(startX, startY, endX - startX, endY - startY);
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = 'rgba(151, 194, 252, 0.45)';
+                    ctx.fillRect(startX, startY, endX - startX, endY - startY);
+                }
+            });
+        }; // end makeMeMultiSelect
+
+		$(document).ready(() => {
+            const container = $("#network");
+            const network = new vis.Network(container[0], { nodes, edges }, options);
+            makeMeMultiSelect(container, network, nodes);
+            ntw = network;
+            ntw.on("click", (props) => {
+                updateSelected();
+            })
+            ntw.on("dragEnd", (props) => {
+                updateSelected();
+            })
+        });
+
+    </script>
+</body>
+</html>
