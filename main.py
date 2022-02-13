@@ -45,4 +45,6 @@ async def search_nodes(request: Request):
 async def add_node(request: Request):
     j = await request.json()
     obj = json.load(open(f"nodes/{j['name']}.json","r"))
+    if "favicon" not in obj:
+        obj["favicon"] = "/".join(obj["data"].split("/")[:3]) + "/favicon.ico"
     return obj

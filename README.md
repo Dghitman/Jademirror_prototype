@@ -2,6 +2,12 @@
 
 Our prototype for Projector-2022 hackaton
 
+## Some info
+
+– The hackaton will be held from Friday evening to Sunday, Feb 11 – 13
+
+– Pls check the [description](https://projector2022.te-st.ru/)
+
 ## What are we gonna do?
 
 – This prototype will be able to transform and visualize graphs of different data
@@ -15,5 +21,21 @@ Our prototype for Projector-2022 hackaton
     – we make NER of this data
     – we summarize this data
     – we find connections between the similar nodes
+
+## How to test the prototype?
+
+just 
+
+```
+  docker-compose build
+  docker-compose up
+```
+
+then go to `localhost:8000`
+
+## How to write a worker?
+
+– See examples in worker directory. A worker is a pickled object, saved from the corresponding jupyter notebook (see bsoup for example)
+
 
 

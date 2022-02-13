@@ -18,9 +18,11 @@ class Graph:
                 if result is None:
                     continue
                 type, data, label = result
+                parents = [[h, callback.__class__.__name__, label]]
                 node_to_add = {
                     "data": data,
                     "type": type,
+                    "parents": parents
                 }
                 node_hash = hashlib.sha256(json.dumps(node_to_add).encode("utf-8")).hexdigest()
                 node_to_add["nodeHash"] = node_hash
@@ -35,12 +37,14 @@ class Graph:
                 result = callback(n1["type"], n1["data"], n2["type"], n2["data"])
                 if result is None:
                     continue
-                type, data = result
+                type, data, label = result
+                parents = list(sorted([[h1, callback.__class__.__name__, label], [h2, callback.__class__.__name__, label]]))
                 node_to_add = {
                     "data": data,
                     "type": type,
+                    "parents": parents
                 }
-                node_hash = hashlib.sha256(json.dumps(node_to_add).encode("utf-8")).hexdigest()
+                node_hash = hashlib.sha256(json.dumps(node_to_add["data"]).encode("utf-8")).hexdigest()
                 node_to_add["nodeHash"] = node_hash
                 nodes_to_add[node_hash] = node_to_add
         return nodes_to_add

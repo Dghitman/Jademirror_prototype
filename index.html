@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans&family=Roboto:wght@100&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.12.0/dist/tf.min.js"></script>
@@ -14,20 +17,28 @@
 var graph = {};
 var subGraph = {};
 
-function init() {
+img_load = "https://icon-library.com/images/loading-icon-transparent-background/loading-icon-transparent-background-12.jpg";
+img_logo = "https://raw.githubusercontent.com/jademirror/jademirror_projector/master/logo_team_512.png"
 
+function init() {
+    document.getElementById("updbtn").style.backgroundImage = "url('" + img_logo + "')";
+}
+
+function wait() {
+    document.getElementById("updbtn").style.backgroundImage = "url('" + img_load + "')";
 }
 
 function hash(object) {
-    return CryptoJS.SHA256(JSON.stringify(object)).toString();
+    return CryptoJS.SHA256(JSON.stringify(object.data)).toString();
 }
 
-function addArtifact(name, data, type, parents) {
+function addArtifact(name, data, type, parents, favicon) {
     var node = {
         "name": name,
         "data": data,
         "type": type,
         "parents": parents,
+        "favicon": favicon
     };
     nodeHash = hash(node);
     node["nodeHash"] = nodeHash;
@@ -45,28 +56,50 @@ function view() {
                     if (label.length > 20) {
                         label = label.slice(0,10) + "..." + label.slice(-7);
                     }
-                    nodes.add({name: graph[n].name, id: n, shape: "image", image: mainLink + "/favicon.ico", label: label});
+                    nodes.add({name: graph[n].name, id: n, shape: "image", image: graph[n].favicon, label: label});
                     break;
                 case "text":
-                    fullText = graph[n].data;
+                    fullText = graph[n].data.split(";")[0];
                     label = "";
                     line = "";
                     f=false;
                     for(var i=0;i<fullText.length;i++) {
-                        if (i>300) {
+                        if (i>50) {
                             label = label.slice(0,-2) + "...";
                             break;
                         }
                         line += fullText[i];
-                        if (line.length >= 30) f=true;
+                        if (line.length >= 15) f=true;
                         if (f && fullText[i] == " ") {
                             label += line + "\n";
                             line = "";
                             f = false;
                         }
                     }
-                    nodes.add({name: graph[n].name, id: n, shape: "box", label: label});
-                    break;                    
+                    nodes.add({name: graph[n].name, id: n, shape: "image", image: "https://v1.iconsearch.ru/uploads/icons/mapicons/32x32/administration.png", label: label});
+                    break;
+                case "ORG":
+                    nodes.add({name: graph[n].name, id: n, shape: "image", image: "https://v1.iconsearch.ru/uploads/icons/mapicons/32x32/factory.png", label: graph[n].data});
+                    break;
+                case "PER":
+                    nodes.add({name: graph[n].name, id: n, shape: "image", image: "https://v1.iconsearch.ru/uploads/icons/mapicons/32x32/jogging.png", label: graph[n].data});
+                    break;
+                case "LOC":
+                    nodes.add({name: graph[n].name, id: n, shape: "image", image: "https://v1.iconsearch.ru/uploads/icons/mapicons/32x32/cluster3.png", label: graph[n].data});
+                    break;
+                case "sim":
+                    parents = graph[n].parents;
+                    f = false;
+                    for(c in edges) {
+                        if ((edges[c].from == parents[0][0]) && (edges[c].to == parents[1][0])) {
+                            f = true;
+                            break;
+                        }
+                    }
+                    if (!f) {
+                        edges.add({from: parents[0][0], to: parents[1][0], label: parents[0][2]});
+                    }
+                    continue;
             }
             parents = graph[n].parents
             for(var p in parents) {
@@ -78,26 +111,16 @@ function view() {
                     }
                 }
                 if (!f) {
-                    edges.add({from: parents[p][0], to: graph[n].nodeHash, label: parents[p][2]});
+                    edges.add({from: parents[p][0], to: graph[n].nodeHash});
                 }
             }
         }
     }
-}
-
-function test() {
-    for(var i=0;i<30;i++) {
-        addArtifact(hash(Math.random()), "article", [])
-    }
-    view();
-}
-
-function testLink() {
-    addArtifact("https://meduza.io/feature/2022/02/02/v-groznom-proshel-miting-na-kotorom-sozhgli-portrety-chlenov-semi-yangulbaevyh", "link", []);
-    view();
+    init()
 }
 
 async function updateGraph() {
+    wait()
     const response = await fetch('/g', {
         method: 'POST', 
         mode: 'cors', 
@@ -111,6 +134,7 @@ async function updateGraph() {
         body: JSON.stringify(subGraph)
     });
     response.json().then(data => {
+        console.log(data)
         for(var n in data) {
             if (graph[n] === undefined) {
                 graph[n] = data[n];
@@ -124,6 +148,7 @@ async function search(t) {
     let found = document.getElementById("found");
     if (t.trim()=="") {
         found.innerHTML = "";
+        found.style.visibility = "hidden";
         return 0;
     };
     const response = await fetch('/q', {
@@ -151,6 +176,7 @@ async function search(t) {
             }
             if (f) continue;
             found.innerHTML += '<div onclick="loadNode(this,\'' + data[i].name + '\')"><img src="' + data[i].favicon + '" />' + data[i].name + '</div>';
+            found.style.visibility = "visible";
         }
     });
 }
@@ -177,13 +203,14 @@ async function loadNode(d,t) {
     });
 
     response.json().then(data => {
-        addArtifact(t, data.data, data.type);
+        addArtifact(t, data.data, data.type, undefined, data.favicon);
         view();
     });
 }
 
 function closePopup() {
     document.getElementById("searchinput").value = "";
+    document.getElementById("found").style.visibility = "hidden";
 }
 
 function updateSelected() {
@@ -195,12 +222,35 @@ function updateSelected() {
     }
     if(s.length > 0) {
         btn.style.visibility = "visible";
+        btn.style.opacity = "1";
     } else {
-        btn.style.visibility = "hidden";
+        btn.style.opacity = "0";
     }
 }
 
+function dropFile(ev) {
+  console.log('File(s) dropped');
 
+  // Prevent default behavior (Prevent file from being opened)
+  ev.stopPropagation(); // Stops some browsers from redirecting.
+  ev.preventDefault();
+
+  if (ev.dataTransfer.items) {
+    // Use DataTransferItemList interface to access the file(s)
+    for (var i = 0; i < ev.dataTransfer.items.length; i++) {
+      // If dropped items aren't files, reject them
+      if (ev.dataTransfer.items[i].kind === 'file') {
+        var file = ev.dataTransfer.items[i].getAsFile();
+        console.log('... file[' + i + '].name = ' + file.name);
+      }
+    }
+  } else {
+    // Use DataTransfer interface to access the file(s)
+    for (var i = 0; i < ev.dataTransfer.files.length; i++) {
+      console.log('... file[' + i + '].name = ' + ev.dataTransfer.files[i].name);
+    }
+  }
+}
 
 </script>
 <style type="text/css">
@@ -223,6 +273,7 @@ body {
 }
 
 #search input {
+    font-family: 'Roboto', sans-serif;
     font-size: 24pt;
     outline: none;
     padding: 0.2em;
@@ -240,13 +291,18 @@ body {
 }
 
 #found {
+    position: relative;
+    padding-top: 0.3em;
+    top: -0.3em;
     background-color: #fff;
     font-size: 24pt;
     max-height: 600px;
     overflow-y: auto;
+    visibility: hidden;
 }
 
 #found div {
+    font-family: 'Roboto', sans-serif;
     padding: 0.2em;
     border-bottom-style: solid;
     border-bottom-width: 1px;
@@ -272,13 +328,18 @@ body {
     height: 100px;
     background-color: #000;
     border-style: solid;
-    border-radius: 0.3em;
+    border-radius: 999em;
     box-shadow: 0 0 4px #fff;
+    background-image: url('');
+    background-position: center;
+    background-size: contain;
+    transition: opacity 0.3s;
+    opacity: 0;
 }
 </style>
 </head>
 <body onload="init()" oncontextmenu="return false">
-    <div id="network"></div>
+    <div id="network" ondrop="dropFile(event)"></div>
     <div id="search">
         <input id="searchinput" type="text" oninput="search(this.value)" spellcheck="false"></input>
         <div id="found">
@@ -297,7 +358,12 @@ body {
             nodes: nodes,
             edges: edges,
         };
-        var options = {    
+        var options = {   
+            nodes: {
+                font: {
+                    color: "#ffffff"
+                }
+            },
             edges: {
                 smooth: false,
                 color: {
@@ -413,10 +479,15 @@ body {
             ntw = network;
             ntw.on("click", (props) => {
                 updateSelected();
-            })
+                closePopup();
+            });
+            ntw.on("doubleClick", (props) => {
+                updateGraph();
+                closePopup();
+            });
             ntw.on("dragEnd", (props) => {
                 updateSelected();
-            })
+            });
         });
 
     </script>

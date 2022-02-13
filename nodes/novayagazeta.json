@@ -1,4 +1,5 @@
 {
     "data": "https://novayagazeta.ru/feed/rss",
-    "type": "link"
+    "type": "link",
+    "favicon": "https://novayagazeta.ru/fav_144.png"
 }
