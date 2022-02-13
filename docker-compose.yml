@@ -9,10 +9,3 @@ services:
       - ./:/worker
     ports:
       - 8000:8000
-  deeppavlov:
-    image: deeppavlov/base-cpu
-    volumes:
-      - ./deeppavlov/dp_components:/root/.deeppavlov
-      - ./deeppavlov/dp_envs:/venv
-    environment:
-      - CONFIG=ner_rus

@@ -21,3 +21,10 @@ Our prototype for Projector-2022 hackaton
     – we make NER of this data
     – we find connections between the similar nodes
 
+## Howto run
+
+  ```
+    docker-compose build
+    docker-compose up
+  ```
+
