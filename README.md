@@ -19,23 +19,5 @@ Our prototype for Projector-2022 hackaton
   
     – we download data from sources
     – we make NER of this data
-    – we summarize this data
     – we find connections between the similar nodes
-
-## How to test the prototype?
-
-just 
-
-```
-  docker-compose build
-  docker-compose up
-```
-
-then go to `localhost:8000`
-
-## How to write a worker?
-
-– See examples in worker directory. A worker is a pickled object, saved from the corresponding jupyter notebook (see bsoup for example)
-
-
 
